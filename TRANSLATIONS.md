@@ -1,8 +1,8 @@
 # Translation Status
 
-Last updated: 2026-01-13 10:51:33
+Last updated: 2026-01-13 11:21:25
 
-Reference locale (en): **342 keys**
+Reference locale (en): **385 keys**
 
 ## Overview
 
