@@ -64,6 +64,14 @@ import {
   isUnitUsed,
   updateUnit,
 } from "../controllers/productOptions.ts";
+import {
+  getPayPalConfig,
+  updatePayPalConfig,
+  testPayPalConnection,
+  createPaymentLink,
+  capturePayment,
+  getPaymentsByInvoice,
+} from "../controllers/payments.ts";
 import { buildInvoiceHTML, generatePDF } from "../utils/pdf.ts";
 import { generateUBLInvoiceXML } from "../utils/ubl.ts"; // legacy direct import
 import { generateInvoiceXML, listXMLProfiles } from "../utils/xmlProfiles.ts";
@@ -1417,6 +1425,90 @@ adminRoutes.get("/export/full", async (c) => {
     }
   }
 });
+
+// =====================
+// PayPal Integration Routes
+// =====================
+
+// GET /api/v1/integrations/paypal - Get PayPal configuration
+adminRoutes.get("/api/v1/integrations/paypal", requireAdminAuth, async (c) => {
+  try {
+    const config = await getPayPalConfig();
+    return c.json(config);
+  } catch (e) {
+    console.error("Failed to get PayPal config:", e);
+    return c.json({ error: "Failed to get PayPal configuration" }, 500);
+  }
+});
+
+// PUT /api/v1/integrations/paypal - Update PayPal configuration
+adminRoutes.put("/api/v1/integrations/paypal", requireAdminAuth, async (c) => {
+  try {
+    const body = await c.req.json();
+    await updatePayPalConfig(body);
+    const config = await getPayPalConfig();
+    return c.json(config);
+  } catch (e) {
+    console.error("Failed to update PayPal config:", e);
+    return c.json({ error: "Failed to update PayPal configuration", details: String(e) }, 500);
+  }
+});
+
+// POST /api/v1/integrations/paypal/test - Test PayPal connection
+adminRoutes.post("/api/v1/integrations/paypal/test", requireAdminAuth, async (c) => {
+  try {
+    const result = await testPayPalConnection();
+    return c.json(result);
+  } catch (e) {
+    console.error("PayPal connection test failed:", e);
+    return c.json({ success: false, message: String(e) });
+  }
+});
+
+// POST /api/v1/invoices/:id/payment-link - Generate PayPal payment link for invoice
+adminRoutes.post("/api/v1/invoices/:id/payment-link", requireAdminAuth, async (c) => {
+  const invoiceId = c.req.param("id");
+  try {
+    const body = await c.req.json().catch(() => ({}));
+
+    // Determine base URL for return/cancel URLs
+    const origin = c.req.header("origin") || c.req.header("referer")?.replace(/\/[^/]*$/, "") || "";
+    const returnUrl = body.returnUrl || `${origin}/public/payment/return`;
+    const cancelUrl = body.cancelUrl || `${origin}/public/payment/cancel`;
+
+    const result = await createPaymentLink(invoiceId, returnUrl, cancelUrl);
+    return c.json(result);
+  } catch (e) {
+    console.error("Failed to create payment link:", e);
+    return c.json({ error: "Failed to create payment link", details: String(e) }, 500);
+  }
+});
+
+// GET /api/v1/invoices/:id/payments - Get payments for invoice
+adminRoutes.get("/api/v1/invoices/:id/payments", requireAdminAuth, async (c) => {
+  const invoiceId = c.req.param("id");
+  try {
+    const payments = getPaymentsByInvoice(invoiceId);
+    return c.json(payments);
+  } catch (e) {
+    console.error("Failed to get payments:", e);
+    return c.json({ error: "Failed to get payments" }, 500);
+  }
+});
+
+// POST /api/v1/payments/:orderId/capture - Capture a PayPal payment
+adminRoutes.post("/api/v1/payments/:orderId/capture", requireAdminAuth, async (c) => {
+  const orderId = c.req.param("orderId");
+  try {
+    const payment = await capturePayment(orderId);
+    return c.json(payment);
+  } catch (e) {
+    console.error("Failed to capture payment:", e);
+    return c.json({ error: "Failed to capture payment", details: String(e) }, 500);
+  }
+});
+
+export default adminRoutes;
 
 // Recursive directory copy helper
 async function copyDirRecursive(src: string, dest: string) {

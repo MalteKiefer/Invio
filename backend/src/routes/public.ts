@@ -3,6 +3,13 @@ import { Hono } from "hono";
 import { normalize, relative, resolve } from "std/path";
 import { getInvoiceByShareToken } from "../controllers/invoices.ts";
 import { getSettings } from "../controllers/settings.ts";
+import {
+  processWebhook,
+  capturePayment,
+  cancelPayment,
+  getPaymentByProviderPaymentId,
+  getPayPalConfig,
+} from "../controllers/payments.ts";
 import { buildInvoiceHTML, generatePDF } from "../utils/pdf.ts";
 import { generateUBLInvoiceXML } from "../utils/ubl.ts"; // legacy direct import (will be removed after deprecation window)
 import { generateInvoiceXML, listXMLProfiles } from "../utils/xmlProfiles.ts";
@@ -335,6 +342,130 @@ publicRoutes.get("/public/xml-profiles", (c) => {
     builtIn: true,
   }));
   return c.json(profiles);
+});
+
+// =====================
+// PayPal Webhook & Payment Routes
+// =====================
+
+// POST /api/webhooks/paypal - PayPal webhook handler
+publicRoutes.post("/api/webhooks/paypal", async (c) => {
+  try {
+    const body = await c.req.text();
+    const headers = {
+      transmissionId: c.req.header("paypal-transmission-id") || "",
+      transmissionTime: c.req.header("paypal-transmission-time") || "",
+      certUrl: c.req.header("paypal-cert-url") || "",
+      authAlgo: c.req.header("paypal-auth-algo") || "",
+      transmissionSig: c.req.header("paypal-transmission-sig") || "",
+    };
+
+    const event = JSON.parse(body);
+    const eventId = event.id || crypto.randomUUID();
+    const eventType = event.event_type || "UNKNOWN";
+
+    const result = await processWebhook(eventId, eventType, body, headers);
+
+    if (result.success) {
+      return c.json({ status: "ok", message: result.message });
+    } else {
+      console.error("Webhook processing failed:", result.message);
+      // Return 200 to avoid PayPal retries for non-recoverable errors
+      return c.json({ status: "error", message: result.message });
+    }
+  } catch (e) {
+    console.error("PayPal webhook error:", e);
+    return c.json({ status: "error", message: "Internal error" }, 500);
+  }
+});
+
+// GET /public/payment/return - Payment success handler
+publicRoutes.get("/public/payment/return", async (c) => {
+  const url = new URL(c.req.url);
+  const token = url.searchParams.get("token"); // PayPal sends order ID as 'token'
+  const payerID = url.searchParams.get("PayerID");
+
+  if (!token) {
+    return c.json({ error: "Missing payment token" }, 400);
+  }
+
+  try {
+    // Capture the payment
+    const payment = await capturePayment(token);
+
+    // Return success with payment details
+    return c.json({
+      success: true,
+      status: payment.status,
+      paymentId: payment.id,
+      invoiceId: payment.invoiceId,
+      amount: payment.amount,
+      currency: payment.currency,
+    });
+  } catch (e) {
+    console.error("Payment capture failed:", e);
+    return c.json({
+      success: false,
+      error: "Payment capture failed",
+      details: e instanceof Error ? e.message : String(e),
+    }, 500);
+  }
+});
+
+// GET /public/payment/cancel - Payment cancel handler
+publicRoutes.get("/public/payment/cancel", async (c) => {
+  const url = new URL(c.req.url);
+  const token = url.searchParams.get("token"); // PayPal sends order ID as 'token'
+
+  if (token) {
+    try {
+      cancelPayment(token);
+    } catch (e) {
+      console.error("Failed to update cancelled payment:", e);
+    }
+  }
+
+  return c.json({
+    success: false,
+    cancelled: true,
+    message: "Payment was cancelled",
+  });
+});
+
+// GET /public/payment/status/:orderId - Check payment status
+publicRoutes.get("/public/payment/status/:orderId", async (c) => {
+  const orderId = c.req.param("orderId");
+
+  try {
+    const payment = getPaymentByProviderPaymentId(orderId);
+    if (!payment) {
+      return c.json({ error: "Payment not found" }, 404);
+    }
+
+    return c.json({
+      status: payment.status,
+      amount: payment.amount,
+      currency: payment.currency,
+      createdAt: payment.createdAt,
+    });
+  } catch (e) {
+    console.error("Failed to get payment status:", e);
+    return c.json({ error: "Failed to get payment status" }, 500);
+  }
+});
+
+// GET /public/paypal/config - Get public PayPal config (for frontend)
+publicRoutes.get("/public/paypal/config", async (c) => {
+  try {
+    const config = await getPayPalConfig();
+    // Only return public info, never credentials
+    return c.json({
+      enabled: config.enabled,
+      mode: config.mode,
+    });
+  } catch (e) {
+    return c.json({ enabled: false, mode: "sandbox" });
+  }
 });
 
 export { publicRoutes };

@@ -457,6 +457,70 @@ function ensureSchemaUpgrades(database: DB) {
         }
       }
     }
+
+    // Ensure payments table exists for PayPal integration
+    database.execute(`
+      CREATE TABLE IF NOT EXISTS payments (
+        id TEXT PRIMARY KEY,
+        invoice_id TEXT NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+        provider TEXT NOT NULL DEFAULT 'paypal',
+        provider_payment_id TEXT,
+        provider_payer_id TEXT,
+        amount NUMERIC NOT NULL,
+        currency TEXT NOT NULL,
+        status TEXT CHECK(status IN ('pending', 'completed', 'failed', 'refunded', 'cancelled')) DEFAULT 'pending',
+        provider_status TEXT,
+        provider_response TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    database.execute(`
+      CREATE INDEX IF NOT EXISTS idx_payments_invoice ON payments(invoice_id);
+    `);
+    database.execute(`
+      CREATE INDEX IF NOT EXISTS idx_payments_provider_id ON payments(provider_payment_id);
+    `);
+    database.execute(`
+      CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+    `);
+
+    // Ensure webhook_events table exists for idempotent webhook processing
+    database.execute(`
+      CREATE TABLE IF NOT EXISTS webhook_events (
+        id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL DEFAULT 'paypal',
+        event_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        processed BOOLEAN DEFAULT 0,
+        processed_at TIMESTAMP,
+        error_message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(provider, event_id)
+      );
+    `);
+    database.execute(`
+      CREATE INDEX IF NOT EXISTS idx_webhook_events_event_id ON webhook_events(event_id);
+    `);
+    database.execute(`
+      CREATE INDEX IF NOT EXISTS idx_webhook_events_processed ON webhook_events(processed);
+    `);
+
+    // Ensure invoices.payment_status exists
+    if (!invNames.has("payment_status")) {
+      try {
+        database.execute(
+          "ALTER TABLE invoices ADD COLUMN payment_status TEXT DEFAULT 'unpaid'",
+        );
+        console.log("✅ Added invoices.payment_status column");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (!/duplicate column|already exists/i.test(msg)) {
+          console.warn("Could not add invoices.payment_status:", msg);
+        }
+      }
+    }
   } catch (e) {
     console.warn("Schema upgrade check failed:", e);
   }

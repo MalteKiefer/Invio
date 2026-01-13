@@ -7,6 +7,7 @@ import ThemeToggle from "../islands/ThemeToggle.tsx";
 import ExportAll from "../islands/ExportAll.tsx";
 import TaxDefinitionsManager from "../islands/TaxDefinitionsManager.tsx";
 import ProductOptionsManager from "../islands/ProductOptionsManager.tsx";
+import PayPalIntegration from "../islands/PayPalIntegration.tsx";
 import {
   LuAlertTriangle,
   LuBuilding2,
@@ -21,6 +22,7 @@ import {
   LuSave,
   LuLanguages,
   LuPackage,
+  LuPlugZap,
 } from "../components/icons.tsx";
 import {
   backendGet,
@@ -263,6 +265,7 @@ export default function SettingsPage(props: PageProps<Data & { demoMode: boolean
     "localization",
     "templates",
     "payments",
+    "integrations",
     "tax",
     "products",
     "numbering",
@@ -304,6 +307,7 @@ export default function SettingsPage(props: PageProps<Data & { demoMode: boolean
               localization: t("Localization"),
               templates: t("Templates"),
               payments: t("Payments"),
+              integrations: t("Integrations"),
               tax: t("Tax"),
               products: t("Products"),
               numbering: t("Numbering"),
@@ -319,6 +323,7 @@ export default function SettingsPage(props: PageProps<Data & { demoMode: boolean
             { value: link("localization"), label: t("Localization"), icon: LuLanguages },
             { value: link("templates"), label: t("Templates"), icon: LuLayoutTemplate, show: hasTemplates },
             { value: link("payments"), label: t("Payments"), icon: LuCreditCard },
+            { value: link("integrations"), label: t("Integrations"), icon: LuPlugZap },
             { value: link("tax"), label: t("Tax"), icon: LuPercent },
             { value: link("products"), label: t("Products"), icon: LuPackage },
             { value: link("numbering"), label: t("Numbering"), icon: LuHash },
@@ -368,6 +373,12 @@ export default function SettingsPage(props: PageProps<Data & { demoMode: boolean
               <a href={link("payments")} class={section === "payments" ? "active" : undefined}>
                 <LuCreditCard size={20} class="mr-2" />
                 {t("Payments")}
+              </a>
+            </li>
+            <li>
+              <a href={link("integrations")} class={section === "integrations" ? "active" : undefined}>
+                <LuPlugZap size={20} class="mr-2" />
+                {t("Integrations")}
               </a>
             </li>
             <li>
@@ -644,6 +655,15 @@ export default function SettingsPage(props: PageProps<Data & { demoMode: boolean
                 </button>
               </div>
             </form>
+          )}
+
+          {section === "integrations" && (
+            <div class="space-y-4">
+              <h2 class="text-xl font-semibold">{t("Integrations")}</h2>
+              <p class="text-sm opacity-70">{t("Integrations helper")}</p>
+
+              <PayPalIntegration demoMode={demoMode} />
+            </div>
           )}
 
           {section === "tax" && (

@@ -2,6 +2,7 @@ import { Handlers, PageProps } from "$fresh/server.ts";
 import { Layout } from "../../components/Layout.tsx";
 import ConfirmOnSubmit from "../../islands/ConfirmOnSubmit.tsx";
 import CopyPublicLink from "../../islands/CopyPublicLink.tsx";
+import PaymentButton from "../../islands/PaymentButton.tsx";
 import {
   LuCheckCircle,
   LuPencil,
@@ -317,6 +318,15 @@ export default function InvoiceDetail(props: PageProps<Data>) {
                   {t("Mark as Paid")}
                 </button>
               </form>
+            )}
+            {/* PayPal Payment Button */}
+            {inv.status !== "draft" && inv.status !== "paid" && (
+              <PaymentButton
+                invoiceId={inv.id}
+                invoiceTotal={inv.total || 0}
+                currency={inv.currency || "USD"}
+                status={inv.status || "draft"}
+              />
             )}
             {/* Overflow menu for secondary actions */}
             <div class="dropdown dropdown-end">

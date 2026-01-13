@@ -150,6 +150,43 @@ export interface InvoiceTax {
   taxAmount: number;
 }
 
+// Payment types for PayPal integration
+export interface Payment {
+  id: string;
+  invoiceId: string;
+  provider: "paypal";
+  providerPaymentId?: string;
+  providerPayerId?: string;
+  amount: number;
+  currency: string;
+  status: "pending" | "completed" | "failed" | "refunded" | "cancelled";
+  providerStatus?: string;
+  providerResponse?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface WebhookEvent {
+  id: string;
+  provider: "paypal";
+  eventId: string;
+  eventType: string;
+  payload: string;
+  processed: boolean;
+  processedAt?: Date;
+  errorMessage?: string;
+  createdAt: Date;
+}
+
+export interface PayPalConfig {
+  enabled: boolean;
+  mode: "sandbox" | "live";
+  clientIdConfigured: boolean;
+  secretConfigured: boolean;
+  webhookId?: string;
+  webhookUrl: string;
+}
+
 // Request/Response types for API
 export interface CreateInvoiceRequest {
   customerId: string;
