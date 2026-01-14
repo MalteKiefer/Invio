@@ -106,6 +106,40 @@ Note: Caddy automatically sets `X-Forwarded-For` by default.
 
 See [`.env.example`](.env.example) for all configuration options.
 
+## 💳 Payment Integrations
+
+Invio supports payment integrations to accept payments directly on your invoices. Configure integrations in **Settings → Integrations**.
+
+### PayPal Integration
+
+Accept payments via PayPal on your published invoices. Supports both Sandbox (testing) and Live (production) modes.
+
+**Setup:**
+1. Create a PayPal Developer account at [developer.paypal.com](https://developer.paypal.com)
+2. Create a REST API app to get your Client ID and Secret
+3. Generate an encryption key: `openssl rand -base64 32`
+4. Add the encryption key to your environment variables
+5. Configure PayPal credentials in Settings → Integrations
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PAYPAL_ENCRYPTION_KEY` | Yes | 32-byte base64 key for encrypting PayPal credentials |
+
+**Features:**
+- **Encrypted Credentials** — PayPal Client ID and Secret are stored with AES-256-GCM encryption
+- **Sandbox Mode** — Test payments without real transactions
+- **Payment Links** — Generate PayPal checkout links for invoices
+- **Webhook Support** — Automatic payment status updates via PayPal webhooks
+- **Payment Tracking** — Full payment history on each invoice
+
+**Webhook Configuration:**
+To receive automatic payment updates, configure a webhook in your PayPal Developer Dashboard:
+1. Go to your app's settings in the PayPal Developer Dashboard
+2. Add a webhook URL: `https://your-domain.com/api/webhooks/paypal`
+3. Subscribe to events: `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED`, `PAYMENT.CAPTURE.REFUNDED`
+
+> **Note:** PayPal credentials are encrypted at rest. Never commit your `PAYPAL_ENCRYPTION_KEY` to version control.
+
 ## 🖼️ Screenshots
 <details>
 <summary>Dashboard</summary>
